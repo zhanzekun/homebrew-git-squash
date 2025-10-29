@@ -10,6 +10,22 @@ NEW_BRANCH_NAME=""
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --help|-h)
+      echo "Squashes all commits just like GitHub squash merge"
+      echo ""
+      echo "Usage: git squash <branch> [--new-branch|-n [branch-name]]"
+      echo ""
+      echo "Options:"
+      echo "  --new-branch, -n [branch-name]  Create a new branch for squashed result instead of squashing the current branch"
+      echo "  --help, -h                       Show this help message"
+      echo ""
+      echo "Examples:"
+      echo "  git squash master              # Squash commits on current branch"
+      echo "  git squash master -n           # Create new branch with squashed result"
+      echo "  git squash master -n squash    # Create branch named 'squash'"
+      echo "  git squash master -n=squash    # Create branch named 'squash' (with =)"
+      exit 0
+      ;;
     --new-branch|-n)
       CREATE_NEW_BRANCH=true
       shift
