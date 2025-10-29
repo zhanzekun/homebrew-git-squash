@@ -136,6 +136,7 @@ git push
 ```bash
 brew tap zhanzekun/git-squash
 brew install git-squash
+# 或者 brew install zekunzhan/git-squash/git-squash
 git squash --help  # 测试是否安装成功
 ```
 
