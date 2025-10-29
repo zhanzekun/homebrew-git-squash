@@ -7,6 +7,11 @@ TEMP_BRANCH="temp$(date +%s)"
 CREATE_NEW_BRANCH=false
 NEW_BRANCH_NAME=""
 
+# Check if git cz (commitizen) is available
+function has_commitizen {
+  command -v git-cz >/dev/null 2>&1 || git cz --help >/dev/null 2>&1
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -98,7 +103,16 @@ git merge --squash "$CURRENT_BRANCH"
 
 git add -A
 
-git commit -q -c "$FIRST_COMMIT_ID"
+# Use commitizen if available, otherwise use standard git commit
+if has_commitizen; then
+  echo "Using commitizen for commit message..."
+  if ! git cz; then
+    echo "Commit cancelled or failed"
+    exit 1
+  fi
+else
+  git commit -c "$FIRST_COMMIT_ID"
+fi
 
 if [ "$CREATE_NEW_BRANCH" == true ]; then
   # Create a new branch with the squashed result
