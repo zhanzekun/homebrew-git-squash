@@ -108,11 +108,15 @@ git push origin v1.0.1
 
 # 2. 更新 tap 中的 formula
 cd ~/homebrew-git-squash
-# 修改 version 和 url
-vim git-squash.rb
-# 更新 sha256:
+# 下载新版本的 tarball 并计算 sha256:
 curl -L https://github.com/zhanzekun/git-squash/archive/refs/tags/v1.0.1.tar.gz -o v1.0.1.tar.gz
 shasum -a 256 v1.0.1.tar.gz
+# 将计算出的 sha256 值更新到 formula 文件中
+vim git-squash.rb
+# 在 git-squash.rb 中修改：
+# - version: "1.0.1"
+# - url: "https://github.com/zhanzekun/git-squash/archive/refs/tags/v1.0.1.tar.gz"
+# - sha256: "上面计算出的值"
 
 # 3. 提交更新
 git commit -am "Update to v1.0.1"
