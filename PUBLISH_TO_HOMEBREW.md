@@ -101,24 +101,32 @@ git push
 每次发布新版本时：
 
 ```bash
-# 1. 在主仓库创建新 tag
+# 1. 在主仓库创建本地 tag 并生成 tarball 计算 sha256
 cd /Users/zekun/Documents/wxcode/lib/git-squash
 git tag v1.0.1
-git push origin v1.0.1
+# 使用 git archive 创建本地 tarball 来计算 sha256（在 push tag 之前）
+git archive --format=tar.gz --prefix=git-squash-v1.0.1/ v1.0.1 > /tmp/v1.0.1.tar.gz
+shasum -a 256 /tmp/v1.0.1.tar.gz
+# 记录计算出的 sha256 值
 
-# 2. 更新 tap 中的 formula
+# 2. 更新 tap 中的 formula（在 push tag 之前准备好）
 cd ~/homebrew-git-squash
-# 下载新版本的 tarball 并计算 sha256:
-curl -L https://github.com/zhanzekun/git-squash/archive/refs/tags/v1.0.1.tar.gz -o v1.0.1.tar.gz
-shasum -a 256 v1.0.1.tar.gz
-# 将计算出的 sha256 值更新到 formula 文件中
 vim git-squash.rb
 # 在 git-squash.rb 中修改：
 # - version: "1.0.1"
 # - url: "https://github.com/zhanzekun/git-squash/archive/refs/tags/v1.0.1.tar.gz"
-# - sha256: "上面计算出的值"
+# - sha256: "步骤1中计算出的值"
 
-# 3. 提交更新
+# 3. 先提交并 push formula 更新（可选，也可以后面一起 push）
+# git commit -am "Update to v1.0.1"
+# git push
+
+# 4. 然后 push tag 到 GitHub
+cd /Users/zekun/Documents/wxcode/lib/git-squash
+git push origin v1.0.1
+
+# 5. 如果步骤3还没做，现在提交并 push formula 更新 
+cd ~/homebrew-git-squash
 git commit -am "Update to v1.0.1"
 git push
 ```
