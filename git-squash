@@ -4,14 +4,50 @@ set -e
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 TEMP_BRANCH="temp$(date +%s)"
+CREATE_NEW_BRANCH=false
+NEW_BRANCH_NAME=""
 
-if [ "$1" == "" ]; then
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --new-branch|-n)
+      CREATE_NEW_BRANCH=true
+      shift
+      if [ "$#" -gt 0 ] && [[ ! "$1" == -* ]]; then
+        NEW_BRANCH_NAME="$1"
+        shift
+      fi
+      ;;
+    --new-branch=*|-n=*)
+      CREATE_NEW_BRANCH=true
+      NEW_BRANCH_NAME="${1#*=}"
+      shift
+      ;;
+    *)
+      if [ -z "$TARGET_BRANCH" ]; then
+        TARGET_BRANCH="$1"
+      else
+        echo "Unexpected argument: $1"
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$TARGET_BRANCH" ]; then
   echo "Squashes all commits just like GitHub squash merge"
   echo ""
-  echo "Usage: git squash <branch>"
+  echo "Usage: git squash <branch> [--new-branch|-n [branch-name]]"
   echo ""
-  echo "Examples"
-  echo " - git squash master"
+  echo "Options:"
+  echo "  --new-branch, -n [branch-name]  Create a new branch for squashed result instead of squashing the current branch"
+  echo ""
+  echo "Examples:"
+  echo "  git squash master              # Squash commits on current branch"
+  echo "  git squash master -n           # Create new branch with squashed result"
+  echo "  git squash master -n squash    # Create branch named 'squash'"
+  echo "  git squash master -n=squash    # Create branch named 'squash' (with =)"
   exit 1
 fi
 
@@ -20,25 +56,27 @@ if [ "$(git status -s -uno)" != "" ]; then
   exit 1
 fi
 
-if ! git show-ref "$1" > /dev/null; then
-  echo "Branch $1 does not exist"
+if ! git show-ref "$TARGET_BRANCH" > /dev/null; then
+  echo "Branch $TARGET_BRANCH does not exist"
   exit 1
 fi
 
-FIRST_COMMIT_ID=$(git log $1.. --no-merges --pretty=format:%h | tail -1)
+FIRST_COMMIT_ID=$(git log $TARGET_BRANCH.. --no-merges --pretty=format:%h | tail -1)
 
 if [ "$FIRST_COMMIT_ID" == "" ]; then
   echo "There are no changes to be squashed"
   exit 1
 fi
 
-git checkout -q -b "$TEMP_BRANCH" "$1"
+git checkout -q -b "$TEMP_BRANCH" "$TARGET_BRANCH"
 
-function finish {
-  git checkout -q --force "$CURRENT_BRANCH"
-  git branch -q -D "$TEMP_BRANCH"
+# Clean up temp branch on exit (in case of errors)
+function cleanup {
+  if git show-ref "$TEMP_BRANCH" > /dev/null 2>&1; then
+    git branch -q -D "$TEMP_BRANCH" 2>/dev/null || true
+  fi
 }
-trap finish EXIT
+trap cleanup EXIT
 
 git merge --squash "$CURRENT_BRANCH"
 
@@ -46,6 +84,41 @@ git add -A
 
 git commit -q -c "$FIRST_COMMIT_ID"
 
-git checkout -q "$CURRENT_BRANCH"
-
-git reset -q --hard "$TEMP_BRANCH"
+if [ "$CREATE_NEW_BRANCH" == true ]; then
+  # Create a new branch with the squashed result
+  if [ -n "$NEW_BRANCH_NAME" ]; then
+    if git show-ref "$NEW_BRANCH_NAME" > /dev/null 2>&1; then
+      trap - EXIT
+      git checkout -q "$CURRENT_BRANCH"
+      git branch -q -D "$TEMP_BRANCH"
+      echo "Branch $NEW_BRANCH_NAME already exists"
+      exit 1
+    fi
+    git checkout -q "$CURRENT_BRANCH"
+    git checkout -q -b "$NEW_BRANCH_NAME" "$TEMP_BRANCH"
+    # Clean up temp branch but stay on new branch
+    trap - EXIT
+    git branch -q -D "$TEMP_BRANCH"
+    echo "Created new branch '$NEW_BRANCH_NAME' with squashed commits"
+  else
+    # Generate a default branch name
+    DEFAULT_NEW_BRANCH="${CURRENT_BRANCH}-squashed"
+    if git show-ref "$DEFAULT_NEW_BRANCH" > /dev/null 2>&1; then
+      DEFAULT_NEW_BRANCH="${CURRENT_BRANCH}-squashed-$(date +%s)"
+    fi
+    git checkout -q "$CURRENT_BRANCH"
+    git checkout -q -b "$DEFAULT_NEW_BRANCH" "$TEMP_BRANCH"
+    # Clean up temp branch but stay on new branch
+    trap - EXIT
+    git branch -q -D "$TEMP_BRANCH"
+    echo "Created new branch '$DEFAULT_NEW_BRANCH' with squashed commits"
+  fi
+else
+  # Reset current branch (original behavior)
+  git checkout -q "$CURRENT_BRANCH"
+  git reset -q --hard "$TEMP_BRANCH"
+  # Clean up temp branch
+  trap - EXIT
+  git branch -q -D "$TEMP_BRANCH"
+  echo "Squashed commits on current branch"
+fi
